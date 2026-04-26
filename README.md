@@ -27,6 +27,12 @@ senflow install
 senflow run
 ```
 
+4) (Opcional) Desinstala SenFlow:
+
+```bash
+senflow uninstall
+```
+
 ## Que hace cada comando
 
 ### `senflow install`
@@ -54,6 +60,19 @@ Variables utiles:
 
 - `PORT=3010 senflow run` para cambiar puerto
 - `SENFLOW_DISABLE_BROWSER=1 senflow run` para no abrir navegador
+
+### `senflow uninstall`
+
+Desinstala SenFlow del entorno local:
+
+- elimina launcher global (`~/.local/bin/senflow`)
+- elimina codigo instalado en `~/.senflow/app`
+- preserva datos detectados en `~/.senflow/data` por defecto
+
+Opciones:
+
+- `senflow uninstall --purge`: elimina tambien `~/.senflow` completo (incluye datos)
+- `senflow uninstall --purge --yes`: modo no interactivo (sin confirmacion)
 
 ## Instalacion manual (modo repo local)
 

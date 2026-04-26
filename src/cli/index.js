@@ -2,13 +2,14 @@ const { execFileSync, spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
+const readline = require("node:readline");
 const os = require("node:os");
 const path = require("node:path");
 
 const CLI_NAME = "senflow";
 const MIN_NODE_VERSION = "20.11.0";
 const MIN_NPM_VERSION = "10.2.0";
-const COMMANDS = new Set(["install", "run"]);
+const COMMANDS = new Set(["install", "run", "uninstall"]);
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 
 function info(message) {
@@ -48,6 +49,22 @@ function getAppDir() {
   throw new Error(
     "No se encontro una instalacion de SenFlow valida (package.json). Ejecuta 'senflow install'.",
   );
+}
+
+function getSenflowPaths() {
+  const homeDir = os.homedir();
+  const senflowHome = process.env.SENFLOW_HOME || path.join(homeDir, ".senflow");
+  const appDir = process.env.SENFLOW_APP_DIR || path.join(senflowHome, "app");
+  const binDir = process.env.SENFLOW_BIN_DIR || path.join(homeDir, ".local", "bin");
+  const launcherPath = path.join(binDir, "senflow");
+  const preservedDataDir = path.join(senflowHome, "data");
+
+  return {
+    senflowHome,
+    appDir,
+    launcherPath,
+    preservedDataDir,
+  };
 }
 
 function readEnvMap(fileContent) {
@@ -251,6 +268,54 @@ function validateRuntimePrerequisites() {
   info(`Prerequisitos OK: node ${nodeVersion}, npm ${npmVersion}.`);
 }
 
+function parseUninstallArgs(args) {
+  const options = {
+    purge: false,
+    yes: false,
+    help: false,
+  };
+
+  for (const arg of args) {
+    if (arg === "--purge") {
+      options.purge = true;
+      continue;
+    }
+    if (arg === "--yes" || arg === "-y") {
+      options.yes = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      options.help = true;
+      continue;
+    }
+    throw new Error(`Opcion desconocida para uninstall: '${arg}'.`);
+  }
+
+  return options;
+}
+
+function askForConfirmation(question) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "yes");
+    });
+  });
+}
+
+function removeIfExists(targetPath) {
+  if (!fs.existsSync(targetPath)) {
+    return false;
+  }
+  fs.rmSync(targetPath, { recursive: true, force: true });
+  return true;
+}
+
 function printHelp() {
   console.log(
     [
@@ -262,6 +327,7 @@ function printHelp() {
       "Comandos:",
       "  install   Prepara instalacion local de SenFlow (Fase 2).",
       "  run       Ejecuta SenFlow en modo produccion (Fase 3).",
+      "  uninstall Desinstala launcher y archivos locales.",
       "",
       "Opciones:",
       "  -h, --help  Muestra esta ayuda.",
@@ -331,8 +397,72 @@ async function handleRun() {
   });
 }
 
+async function handleUninstall(args) {
+  const options = parseUninstallArgs(args);
+  if (options.help) {
+    console.log(
+      [
+        "Uso:",
+        "  senflow uninstall [--purge] [--yes]",
+        "",
+        "Opciones:",
+        "  --purge  Elimina tambien datos persistidos en SENFLOW_HOME.",
+        "  --yes    Omite confirmacion interactiva para --purge.",
+      ].join("\n"),
+    );
+    return 0;
+  }
+
+  const { senflowHome, appDir, launcherPath, preservedDataDir } = getSenflowPaths();
+  const appDataDir = path.join(appDir, "data");
+
+  if (options.purge && !options.yes) {
+    const confirmed = await askForConfirmation(
+      `[${CLI_NAME}] Esto eliminara TODO en ${senflowHome}. Escribe 'yes' para continuar: `,
+    );
+    if (!confirmed) {
+      info("Desinstalacion cancelada por el usuario.");
+      return 1;
+    }
+  }
+
+  const launcherRemoved = removeIfExists(launcherPath);
+  if (launcherRemoved) {
+    info(`Launcher eliminado: ${launcherPath}`);
+  } else {
+    info(`Launcher no encontrado: ${launcherPath}`);
+  }
+
+  if (options.purge) {
+    const homeRemoved = removeIfExists(senflowHome);
+    if (homeRemoved) {
+      info(`Se elimino ${senflowHome} por completo (--purge).`);
+    } else {
+      info(`No se encontro ${senflowHome}; no hubo datos para purgar.`);
+    }
+    info("Desinstalacion completada.");
+    return 0;
+  }
+
+  if (fs.existsSync(appDataDir)) {
+    fs.mkdirSync(preservedDataDir, { recursive: true });
+    fs.cpSync(appDataDir, preservedDataDir, { recursive: true, force: true });
+    info(`Datos preservados en ${preservedDataDir}`);
+  }
+
+  const appRemoved = removeIfExists(appDir);
+  if (appRemoved) {
+    info(`Directorio de app eliminado: ${appDir}`);
+  } else {
+    info(`Directorio de app no encontrado: ${appDir}`);
+  }
+
+  info("Desinstalacion completada.");
+  return 0;
+}
+
 async function runCli(argv) {
-  const [command] = argv;
+  const [command, ...commandArgs] = argv;
 
   if (!command || command === "--help" || command === "-h") {
     printHelp();
@@ -348,6 +478,10 @@ async function runCli(argv) {
 
   if (command === "install") {
     return handleInstall();
+  }
+
+  if (command === "uninstall") {
+    return handleUninstall(commandArgs);
   }
 
   return handleRun();
