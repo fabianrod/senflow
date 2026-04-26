@@ -43,8 +43,14 @@ type IncomingMessageEntry = {
     participant?: string | null;
     fromMe?: boolean | null;
   };
-  message?: Record<string, unknown> | null;
+  message?: unknown;
   pushName?: string | null;
+};
+
+type IncomingUpsertPayload = {
+  messages: IncomingMessageEntry[];
+  type?: unknown;
+  requestId?: string;
 };
 
 function jidDigits(value: string | null | undefined): string {
@@ -61,7 +67,7 @@ class MultiSessionManager {
   private eventBus = new EventEmitter();
   private upsertListenerBySocket?: WeakMap<
     WASocket,
-    (upsert: { messages?: Array<IncomingMessageEntry & { key?: { fromMe?: boolean | null } }> }) => void
+    (upsert: IncomingUpsertPayload) => void
   >;
   private recentOutgoingPeerByAccount?: Map<string, RecentPeer>;
   private expectedReplyTargetByAccount?: Map<string, ExpectedReplyTarget>;
@@ -69,7 +75,7 @@ class MultiSessionManager {
 
   private getUpsertListenerMap(): WeakMap<
     WASocket,
-    (upsert: { messages?: Array<IncomingMessageEntry & { key?: { fromMe?: boolean | null } }> }) => void
+    (upsert: IncomingUpsertPayload) => void
   > {
     if (!this.upsertListenerBySocket) {
       this.upsertListenerBySocket = new WeakMap();
@@ -144,6 +150,13 @@ class MultiSessionManager {
       return videoMessage.caption;
     }
     return undefined;
+  }
+
+  private asMessageRecord(value: unknown): Record<string, unknown> | undefined {
+    if (!value || typeof value !== "object") {
+      return undefined;
+    }
+    return value as Record<string, unknown>;
   }
 
   private normalizeDigits(input: string | null | undefined): string | undefined {
@@ -259,7 +272,7 @@ class MultiSessionManager {
       return byParticipant;
     }
 
-    const byPayload = this.extractParticipantPhoneJid(entry.message ?? undefined);
+    const byPayload = this.extractParticipantPhoneJid(this.asMessageRecord(entry.message));
     if (byPayload) {
       return byPayload;
     }
@@ -346,13 +359,10 @@ class MultiSessionManager {
     if (existingListener) {
       socket.ev.off("messages.upsert", existingListener);
     }
-    const upsertListener = (upsert: {
-      messages?: Array<IncomingMessageEntry & { key?: { fromMe?: boolean | null } }>;
-    }) => {
+    const upsertListener = (upsert: IncomingUpsertPayload) => {
       const entries = upsert.messages ?? [];
       for (const entry of entries) {
-        const incomingEntry = entry as IncomingMessageEntry;
-        const remoteJid = this.resolveIncomingRemoteJid(incomingEntry);
+        const remoteJid = this.resolveIncomingRemoteJid(entry);
         const fromMe = Boolean(entry.key?.fromMe);
         if (!remoteJid || fromMe || remoteJid.includes("@g.us")) {
           continue;
@@ -361,13 +371,13 @@ class MultiSessionManager {
         if (ownPhoneDigits && jidDigits(remoteJid) === ownPhoneDigits) {
           continue;
         }
-        const content = this.extractMessageText(entry.message as Record<string, unknown> | undefined);
+        const content = this.extractMessageText(this.asMessageRecord(entry.message));
         if (remoteJid.includes("@lid")) {
           void (async () => {
             const expectedReplyFallback = await this.getExpectedReplyRemoteJid(accountId);
             const fallbackJid =
               expectedReplyFallback ??
-              (await this.resolveLidFallbackByRecentChats(accountId, incomingEntry.pushName));
+              (await this.resolveLidFallbackByRecentChats(accountId, entry.pushName));
             if (!fallbackJid) {
               // Sin correlacion confiable: evita mezclar respuestas de contactos distintos.
               return;

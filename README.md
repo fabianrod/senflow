@@ -4,59 +4,67 @@ Aplicacion local para gestionar campanas de WhatsApp construida con Next.js, Pri
 
 ## Requisitos previos
 
-- Node.js 20 o superior
-- npm 10 o superior
+- Node.js `>=20.11.0`
+- npm `>=10.2.0`
 
-## Instalacion
+## Flujo recomendado (launcher global)
 
-1. Clona el repositorio e ingresa al directorio del proyecto.
-2. Instala las dependencias:
+1) Instala el launcher:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fabianrod/senflow/main/install.sh | bash
+```
+
+2) Prepara el entorno local de la app:
+
+```bash
+senflow install
+```
+
+3) Ejecuta SenFlow en produccion:
+
+```bash
+senflow run
+```
+
+## Que hace cada comando
+
+### `senflow install`
+
+Prepara el proyecto para uso local sin pasos manuales:
+
+- instala dependencias (`npm install`)
+- crea `.env` desde `.env.example` si no existe
+- asegura `DATABASE_URL="file:./data/app.db"`
+- genera `AUTH_SESSION_SECRET` si falta o esta en placeholder
+- crea carpeta `data/`
+- ejecuta Prisma (`npm run db:generate` y `npm run db:migrate`)
+
+### `senflow run`
+
+Ejecuta SenFlow en modo produccion por defecto:
+
+- valida setup minimo
+- si falta setup, ejecuta `senflow install` automaticamente
+- genera build (`npm run build`) solo si no existe
+- arranca servidor (`npm run start`)
+- espera healthcheck y abre navegador automaticamente
+
+Variables utiles:
+
+- `PORT=3010 senflow run` para cambiar puerto
+- `SENFLOW_DISABLE_BROWSER=1 senflow run` para no abrir navegador
+
+## Instalacion manual (modo repo local)
+
+Si prefieres ejecutar desde este repositorio:
 
 ```bash
 npm install
-```
-
-3. Crea el archivo de entorno a partir del ejemplo:
-
-```bash
 cp .env.example .env
-```
-
-4. Revisa y ajusta las variables en `.env`:
-
-```env
-DATABASE_URL="file:./data/app.db"
-AUTH_SESSION_SECRET="define-un-secreto-largo-en-local"
-```
-
-## Preparar base de datos
-
-Ejecuta las migraciones y genera el cliente de Prisma:
-
-```bash
-npm run db:migrate
 npm run db:generate
-```
-
-Opcionalmente, puedes correr el seed (actualmente no inserta datos por defecto):
-
-```bash
-npm run db:seed
-```
-
-## Ejecutar en desarrollo
-
-```bash
+npm run db:migrate
 npm run dev
-```
-
-La app quedara disponible en [http://localhost:3000](http://localhost:3000).
-
-## Build de produccion
-
-```bash
-npm run build
-npm run start
 ```
 
 ## Scripts disponibles
@@ -68,8 +76,10 @@ npm run start
 - `npm run db:migrate`: aplica migraciones con Prisma.
 - `npm run db:generate`: genera el cliente de Prisma.
 - `npm run db:seed`: ejecuta el seed configurado en Prisma.
+- `npm run senflow`: ejecuta la CLI local (`node ./bin/senflow.js`).
 
 ## Notas
 
-- El proyecto usa SQLite y guarda los datos en `data/app.db`.
+- SenFlow guarda SQLite en `data/app.db`.
+- Los archivos SQLite estan ignorados en git.
 - Si cambias el esquema de Prisma, vuelve a ejecutar migraciones y `db:generate`.

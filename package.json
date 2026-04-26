@@ -1,12 +1,16 @@
 {
-  "name": "bulk-whatsapp",
+  "name": "senflow",
   "version": "1.0.0",
   "private": true,
+  "bin": {
+    "senflow": "./bin/senflow.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "senflow": "node ./bin/senflow.js",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed"
@@ -14,6 +18,10 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=20.11.0",
+    "npm": ">=10.2.0"
+  },
   "description": "Aplicacion local para campanas WhatsApp con Next.js y Baileys",
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",

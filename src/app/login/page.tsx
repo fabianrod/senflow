@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
@@ -86,5 +86,15 @@ export default function LoginPage() {
         </p>
       </form>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={<main className="flex min-h-screen items-center justify-center bg-slate-100 p-4">Cargando...</main>}
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

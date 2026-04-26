@@ -30,5 +30,7 @@ pnpm-debug.log*
 
 #data 
 data/*.db
+data/*.db-*
 data/*.sqlite
+data/*.sqlite-*
 data/*.sqlite3

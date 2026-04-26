@@ -74,7 +74,7 @@ export async function useSqliteAuthState(accountId: string): Promise<AuthStoreAd
             const parsed = deserializeWithBufferJson<SignalDataTypeMap[T]>(raw);
             data[id] =
               type === "app-state-sync-key"
-                ? (proto.Message.AppStateSyncKeyData.fromObject(parsed as object) as SignalDataTypeMap[T])
+                ? (proto.Message.AppStateSyncKeyData.fromObject(parsed as object) as unknown as SignalDataTypeMap[T])
                 : parsed;
           }
 
