@@ -9,7 +9,7 @@ const path = require("node:path");
 const CLI_NAME = "senflow";
 const MIN_NODE_VERSION = "20.11.0";
 const MIN_NPM_VERSION = "10.2.0";
-const COMMANDS = new Set(["install", "run", "uninstall"]);
+const COMMANDS = new Set(["install", "run", "uninstall", "update"]);
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 
 function info(message) {
@@ -25,6 +25,13 @@ function runCommand(command, args, cwd) {
     cwd,
     stdio: "inherit",
   });
+}
+
+function runCommandAndCapture(command, args, cwd) {
+  return execFileSync(command, args, {
+    cwd,
+    encoding: "utf8",
+  }).trim();
 }
 
 function hasPackageJson(dirPath) {
@@ -327,6 +334,7 @@ function printHelp() {
       "Comandos:",
       "  install   Prepara instalacion local de SenFlow (Fase 2).",
       "  run       Ejecuta SenFlow en modo produccion (Fase 3).",
+      "  update    Actualiza SenFlow y aplica setup necesario.",
       "  uninstall Desinstala launcher y archivos locales.",
       "",
       "Opciones:",
@@ -395,6 +403,46 @@ async function handleRun() {
       resolve(code ?? 0);
     });
   });
+}
+
+async function handleUpdate() {
+  const appDir = getAppDir();
+
+  info(`Actualizacion iniciada en ${appDir}`);
+
+  if (!fs.existsSync(path.join(appDir, ".git"))) {
+    throw new Error(
+      "No se encontro repositorio git en SENFLOW_APP_DIR. Reinstala con install.sh.",
+    );
+  }
+
+  const currentBranch = runCommandAndCapture("git", ["rev-parse", "--abbrev-ref", "HEAD"], appDir);
+  const previousCommit = runCommandAndCapture("git", ["rev-parse", "--short", "HEAD"], appDir);
+
+  info(`Paso 1/4: actualizando codigo (${currentBranch})...`);
+  runCommand("git", ["fetch", "origin", currentBranch], appDir);
+  runCommand("git", ["pull", "--ff-only", "origin", currentBranch], appDir);
+
+  const updatedCommit = runCommandAndCapture("git", ["rev-parse", "--short", "HEAD"], appDir);
+  if (updatedCommit === previousCommit) {
+    info(`Codigo al dia (${updatedCommit}).`);
+  } else {
+    info(`Codigo actualizado: ${previousCommit} -> ${updatedCommit}.`);
+  }
+
+  info("Paso 2/4: instalando dependencias...");
+  runCommand("npm", ["install"], appDir);
+
+  info("Paso 3/4: preparando entorno y datos...");
+  ensureEnvFile(appDir);
+  ensureDataDirectory(appDir);
+
+  info("Paso 4/4: ejecutando Prisma (generate + migrate)...");
+  runCommand("npm", ["run", "db:generate"], appDir);
+  runCommand("npm", ["run", "db:migrate"], appDir);
+
+  info("Actualizacion completada.");
+  return 0;
 }
 
 async function handleUninstall(args) {
@@ -482,6 +530,10 @@ async function runCli(argv) {
 
   if (command === "uninstall") {
     return handleUninstall(commandArgs);
+  }
+
+  if (command === "update") {
+    return handleUpdate();
   }
 
   return handleRun();

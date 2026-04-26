@@ -27,7 +27,13 @@ senflow install
 senflow run
 ```
 
-4) (Opcional) Desinstala SenFlow:
+4) Actualiza SenFlow cuando haya una nueva version:
+
+```bash
+senflow update
+```
+
+5) (Opcional) Desinstala SenFlow:
 
 ```bash
 senflow uninstall
@@ -60,6 +66,15 @@ Variables utiles:
 
 - `PORT=3010 senflow run` para cambiar puerto
 - `SENFLOW_DISABLE_BROWSER=1 senflow run` para no abrir navegador
+
+### `senflow update`
+
+Actualiza SenFlow en la instalacion local:
+
+- actualiza codigo desde el branch actual (`git fetch` + `git pull --ff-only`)
+- instala/actualiza dependencias (`npm install`)
+- asegura `.env` y carpeta `data/`
+- ejecuta Prisma (`npm run db:generate` y `npm run db:migrate`)
 
 ### `senflow uninstall`
 
